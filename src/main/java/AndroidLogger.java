@@ -1,9 +1,13 @@
 
+import org.apache.maven.settings.Settings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import soot.*;
 import soot.jimple.*;
 
 import java.io.File;
 import java.util.*;
+import soot.jimple.infoflow.android.data.AndroidMethod;
 
 public class AndroidLogger {
 
@@ -15,9 +19,14 @@ public class AndroidLogger {
     static String outputPath = androidDemoPath + File.separator + "/Instrumented";
 
     private static long curTime;
+    public static Logger log = LoggerFactory.getLogger(Main.class);
+    public static long startTime = 0;
 
 
     public static void main(String[] args){
+
+        Set<String> setOfEvents = new HashSet<>(Arrays.asList("onClick", "onLongClick", "onFocusChange", "onKey",
+                "onTouch", "onCreateContextMenu"));
 
         if(System.getenv().containsKey("ANDROID_HOME"))
             androidJar = System.getenv("ANDROID_HOME")+ File.separator+"platforms";
@@ -36,9 +45,8 @@ public class AndroidLogger {
 
                         public void caseInvokeStmt(InvokeStmt stmt) {
                             InvokeExpr invokeExpr = stmt.getInvokeExpr();
-                            //detect elements with onclick functions
-                            if(invokeExpr.getMethod().getName().equals("onClick")) {
-
+                            String methodName = invokeExpr.getMethod().getName();
+                            if(setOfEvents.contains(methodName)) {
                                 long startTime = System.currentTimeMillis();
                                 long timeSpent = 0;
                                 if(unit instanceof ReturnStmt || unit instanceof ReturnVoidStmt) {
@@ -48,8 +56,6 @@ public class AndroidLogger {
                                 } else if(unit instanceof DefinitionStmt || unit instanceof InvokeStmt) {
                                     startTime = System.currentTimeMillis();
                                 }
-
-
 
                                 b.validate();
                             }
@@ -62,13 +68,14 @@ public class AndroidLogger {
         }));
         PackManager.v().runPacks();
         PackManager.v().writeOutput();
+
     }
 
     private static void addLog(Body b, long timeSpent) {
         JimpleBody body = (JimpleBody) b;
         UnitPatchingChain units = b.getUnits();
         List<Unit> generatedUnits = new ArrayList<>();
-        String content = "Time spent in click: " + timeSpent;
+        String content = "Time spent : " + timeSpent;
         Local psLocal = InstrumentUtil.generateNewLocal(body, RefType.v("java.io.PrintStream"));
         SootField sysOutField = Scene.v().getField("<java.lang.System: java.io.PrintStream out>");
         AssignStmt sysOutAssignStmt = Jimple.v().newAssignStmt(psLocal, Jimple.v().newStaticFieldRef(sysOutField.makeRef()));
