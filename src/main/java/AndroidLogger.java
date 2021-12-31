@@ -49,12 +49,12 @@ public class AndroidLogger {
                             if(setOfEvents.contains(methodName)) {
                                 long startTime = System.currentTimeMillis();
                                 long timeSpent = 0;
+                                if(unit instanceof DefinitionStmt || unit instanceof InvokeStmt) {
+                                    startTime = System.currentTimeMillis();
+                                }
                                 if(unit instanceof ReturnStmt || unit instanceof ReturnVoidStmt) {
                                     timeSpent = System.currentTimeMillis() - startTime;
                                     addLog(b, timeSpent);
-
-                                } else if(unit instanceof DefinitionStmt || unit instanceof InvokeStmt) {
-                                    startTime = System.currentTimeMillis();
                                 }
 
                                 b.validate();
