@@ -26,7 +26,6 @@ public class AndroidLogger {
     private static String eventEndTime = "eventEnd";
     private static String eventDuration = "duration";
 
-
     public static void main(String[] args) {
 
         Set<String> setOfEvents = new HashSet<>(Arrays.asList("onClick", "onLongClick", "onFocusChange", "onKey",
@@ -54,28 +53,39 @@ public class AndroidLogger {
                                 if (unit instanceof DefinitionStmt || unit instanceof InvokeStmt) {
                                     //insert event start time into code
                                     Local localEventStart = InstrumentUtil.generateNewLocal(body, LongType.v());
+                                    localEventStart.setName(eventStartTime);
                                     SootMethod currentTimeMillis = Scene.v().getMethod("<java.lang.System: long currentTimeMillis()>");
                                     StaticInvokeExpr timeInvoke = Jimple.v().newStaticInvokeExpr(currentTimeMillis.makeRef());
                                     AssignStmt timeInitalize = Jimple.v().newAssignStmt(localEventStart, timeInvoke);
                                     units.insertBefore(timeInitalize, unit);
+                                   // System.out.println(localEventStart.getName());
+                                   // System.out.println(localEventStart.getNumber());
 
                                 }
                                 if (unit instanceof ReturnStmt || unit instanceof ReturnVoidStmt) {
                                     Local localEventStart = getLocal(body, eventStartTime);
-
+                                    System.out.println("Name : " + localEventStart.getName());
                                     //insert event end time into code
                                     Local localEventEnd = InstrumentUtil.generateNewLocal(body, LongType.v());
+                                    localEventEnd.setName(eventEndTime);
+                                    System.out.println(localEventEnd.getName());
                                     SootMethod currentTimeMillis = Scene.v().getMethod("<java.lang.System: long currentTimeMillis()>");
                                     StaticInvokeExpr timeInvoke = Jimple.v().newStaticInvokeExpr(currentTimeMillis.makeRef());
                                     AssignStmt timeInitalize = Jimple.v().newAssignStmt(localEventEnd, timeInvoke);
                                     units.insertBefore(timeInitalize, unit);
 
                                     //insert event duration into code
-                                    if (localEventEnd!=null) {
-                                        Local duration = InstrumentUtil.generateNewLocal(body, LongType.v());
+                                    if (localEventStart!=null) {
+                                        Local localDuration = InstrumentUtil.generateNewLocal(body, LongType.v());
+                                        localDuration.setName(eventDuration);
                                         SubExpr subExpr = Jimple.v().newSubExpr(localEventEnd, localEventStart);
-                                        AssignStmt durationAssignStmt = Jimple.v().newAssignStmt(duration, subExpr);
+                                        AssignStmt durationAssignStmt = Jimple.v().newAssignStmt(localDuration, subExpr);
                                         units.insertBefore(durationAssignStmt, unit);
+
+                                        //log localDuration
+                                        units.addAll(InstrumentUtil.generateLogStmts((JimpleBody) body, "Event Duration : ", localDuration));
+
+
                                     }
                                 }
 
@@ -100,22 +110,6 @@ public class AndroidLogger {
             }
         }
         return null;
-    }
-
-    private static void addLog(Body b, long timeSpent) {
-        JimpleBody body = (JimpleBody) b;
-        UnitPatchingChain units = b.getUnits();
-        List<Unit> generatedUnits = new ArrayList<>();
-        String content = "Time spent : " + timeSpent;
-        Local psLocal = InstrumentUtil.generateNewLocal(body, RefType.v("java.io.PrintStream"));
-        SootField sysOutField = Scene.v().getField("<java.lang.System: java.io.PrintStream out>");
-        AssignStmt sysOutAssignStmt = Jimple.v().newAssignStmt(psLocal, Jimple.v().newStaticFieldRef(sysOutField.makeRef()));
-        generatedUnits.add(sysOutAssignStmt);
-        SootMethod printlnMethod = Scene.v().grabMethod("<java.io.PrintStream: void println(java.lang.String)>");
-        Value printlnParameter = StringConstant.v(content);
-        InvokeStmt printlnMethodCallStmt = Jimple.v().newInvokeStmt(Jimple.v().newVirtualInvokeExpr(psLocal, printlnMethod.makeRef(), printlnParameter));
-        generatedUnits.add(printlnMethodCallStmt);
-        units.insertBefore(generatedUnits, body.getFirstNonIdentityStmt());
     }
 
 }
